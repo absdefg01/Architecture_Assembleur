@@ -1,0 +1,100 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start:
+main:
+        @ initialisation du pointeur de pile
+        mov     r13, #0x20000
+
+
+       ldr     r0, =PIO_BASE
+        
+        @ configuration des boutons
+        
+        @ on valide le port correspondant au bouton utilise
+        ldr     r1, =SW1
+        str     r1, [r0, #PIO_PER]
+        @ et on l'interdit en sortie (on le met donc en entree )
+        str     r1, [r0, #PIO_ODR]
+
+
+        @ configuration des IT sur le PIO
+        @ lecture de PIO_ISR, provoque la RAZ
+        @ de l'IT au niveau du PIO
+        ldr     r1, [r0, #PIO_ISR]
+        
+        @ on autorise les IT sur SW1
+        ldr     r1, =SW1
+        str     r1, [r0, #PIO_IER]
+
+        
+        @ configuration de l'AIC
+        ldr     r2, =AIC_BASE
+
+        @ on met l'adresse du sous-programme
+        @ traitant l'IT dans AIC_SVR8
+        adr     r0, GESTION_IT_PIO
+        str     r0, [r2, #AIC_SVR8]
+
+        @ definition de srctype et de la priorite de l'IT
+        @  - srctype : on met n'importe quoi (ici 00) ca change rien
+        @ car il y aura une IT au changement de niveau toujours
+        @  - prio : mettre n'importe quoi >0 (ici 3) 
+                @ car il n'y a qu'une source d'IT (le PIO)
+        mov     r0, #0b0000011 
+        str     r0, [r2, #AIC_SMR8]
+        
+        @ ecriture de n'importe quoi dans AIC_EOICR provoque la RAZ
+        @ de l'IT au niveau de l'AIC
+        str     r0, [r2, #AIC_EOICR] 
+
+
+        @ config teminee, on autorise les IT du PIO
+        mov     r0, #(1<<8)        
+        str     r0, [r2, #AIC_IECR]
+        
+        @ initialisation du compteur d'interruptions (r11)
+        mov     r11,#0
+        
+        @ le programme boucle indefiniment, pour l'arreter
+        @ il faut utiliser le debugger
+exit:
+        b exit
+
+
+@ sous-programme GESTION_IT_PIO, traitement de l'IT generee par SW1
+
+GESTION_IT_PIO: 
+        @ Ajuster et sauvegarder le registre de retour du mode IRQ dans la pile IRQ
+        sub     r14, r14, #4
+        stmfd   r13!, {r0, r1, r14}
+
+
+        @ Indiquer la prise en compte de l'interruption � l'AIC
+        @ ecriture de n'importe quoi dans AIC_EOICR
+        ldr     r0, =AIC_BASE
+        str     r0, [r0, #AIC_EOICR] 
+
+        @ lecture de PIO_ISR, provoque la RAZ
+        @ de l'IT au niveau du PIO
+        ldr     r0, =PIO_BASE
+        ldr     r1, [r0, #PIO_ISR]
+        
+        @ si le bouton est releve (bit a 1) c'est qu'on est dans
+        @ l'IT generee quand on relache le bouton donc on ne fait rien
+        ldr     r1, [r0, #PIO_PDSR]
+        @ SW1 appuye ? (bit a 0)
+        and     r1, r1, #SW1
+        cmp     r1, #SW1
+        beq     pas_de_traitement
+
+        @ on incremente le compteur r11
+        add     r11,r11,#1
+
+pas_de_traitement: 
+        
+        @ Restaurer  r14_irq depuis la pile IRQ et le mettre
+        @ directement dans le PC en restaurant aussi CPSR
+        ldmfd   r13!, {r0, r1, pc}^
+

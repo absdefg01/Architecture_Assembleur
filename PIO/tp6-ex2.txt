@@ -1,0 +1,76 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start: 
+        @ initialisation du pointeur de pile
+    mov     r13, #0x20000
+    @ on charge l'adresse de base des registres du PIO
+    ldr     r0, =PIO_BASE
+        @ configuration des leds
+        ldr     r1, =(LED1|LED2|LED3|LED4|LED5|LED6|LED7|LED8)
+        @ validation des LEDs
+    str     r2, [r0, #PIO_PER]
+    @ et on les met en sortie 
+    str     r2, [r0, #PIO_OER]
+
+        @ r9 contient la valeur de temporisation (environ 1s)
+        ldr r9,=5000000
+        @ r3 contient la valeur � afficher
+        mov r3,#37
+debut:
+        @appel de la fonction d'affichage (avec r3)
+        stmfd r13!,{r3}
+        bl print
+        add r13,r13,#4
+        
+        mov r8,r9
+temp1:  cmp r8,#0
+        beq next        
+        sub r8,r8,#1
+        b temp1
+
+next:   
+        @appel de la fonction d'affichage (avec 0)
+        mov r4,#0
+        stmfd r13!,{r4}
+        bl print
+        add r13,r13,#4
+        
+        mov r8,r9
+temp2:  cmp r8,#0
+        beq debut       
+        sub r8,r8,#1
+        b temp2
+        
+        
+print:  stmfd r13!,{r0,r1,r2,r3,r4,r5,r14}
+        ldr r3,[r13,#28]
+        mov r4,#8
+        adr r1,tab
+        ldr     r0, =PIO_BASE
+
+bcle:   cmp r4,#0
+        beq fin
+        sub r4,r4,#1
+
+        ldr r2,[r1],#4 @ take a led
+
+        and r5,r3,#1
+        mov r3,r3,lsr #1
+        cmp r5,#1
+        bne else
+
+then:   @ on allume LEDi
+        str     r2, [r0, #PIO_CODR]
+        b bcle
+
+else:   @ on �teint LEDi
+        str     r2, [r0, #PIO_SODR]
+        b bcle
+
+fin:    ldmfd r13!,{r0,r1,r2,r3,r4,r5,r15}
+
+tab:    .int LED1,LED2,LED3,LED4,LED5,LED6,LED7,LED8
+
+

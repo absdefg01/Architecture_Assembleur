@@ -1,0 +1,26 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start:
+main:
+        @ initialisation du pointeur de pile
+        mov     r13, #0x20000
+
+        @ on charge l'adresse de base des registres du PIO
+        ldr     r0, =PIO_BASE
+        
+        @ configuration des leds
+        @ on valide le port correspondant aux LEDs utilis�es (led1 et led2)
+        ldr     r1, =(LED1|LED2)
+        str     r1, [r0, #PIO_PER]
+
+        @ et on les met en sortie 
+        str     r1, [r0, #PIO_OER]
+
+               
+           @ on allume LED1 et LED2
+           str     r1, [r0, #PIO_CODR]
+
+exit:    b exit
+
