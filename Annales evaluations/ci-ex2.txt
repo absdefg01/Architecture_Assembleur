@@ -1,0 +1,96 @@
+﻿@ ci 2015 exo2 
+
+.global _start
+_start:
+
+        @ mise en pile des parametres d'entrée de renverse
+        adr     r0,chaine
+        adr     r1,dest
+        stmfd   r13!, {r0,r1}
+        
+        @ appel de renverse
+        bl      renverse
+
+        add     r13,r13,#8
+
+exit:   b       exit
+
+@ sous-programme longueur
+@
+@ en entree (dans la pile) :
+@       - adresse de la chaine 
+@ en sortie (dans la pile):
+@       - longueur de la chaine
+
+longueur:
+        @ sauvegarde des registres utilises
+        stmfd   r13!, {r0, r1,r2, r14}
+
+        @ recuperation de l'adresse de la chaine
+        ldr     r0, [r13,#16]
+        
+        @r1 permet de stocker la longueur
+        mov             r1,#0
+
+        @ tant que le caractère fin de chaine n'est pa atteint...
+tq_longueur:
+        ldrb    r2,[r0],#1
+        cmp             r2,#0
+        beq             fin_longueur
+        add             r1,r1,#1
+        b               tq_longueur
+
+fin_longueur:
+        @ on met dans la pile la longueur (ie r1)
+        str     r1, [r13,#20]
+        
+        @ restauration des registres utilises et fin du sous-programme
+        ldmfd   r13!, {r0, r1,r2, r15}
+
+@ sous-programme renverse
+@
+@ en entree (dans la pile) :
+@       - adresse de la chaine source 
+@       - adresse de la chaine dest 
+
+renverse:
+        @ sauvegarde des registres utilises
+        stmfd   r13!, {r0, r1,r2,r3, r14}
+
+        @ recuperation de l'adresse de la source (r0) et dest (r1)
+        ldr     r0, [r13,#20]
+        ldr     r1, [r13,#24]
+        
+        @ reservation de la place pour la valeur de retour 
+        sub   r13,r13,#4
+        @ mise en pile des parametres d'entrée de longueur
+        stmfd   r13!, {r0}
+        
+        @ appel de longueur
+        bl      longueur
+
+        @ récupération du parametre de retour dans r2
+        add     r13,r13,#4
+        ldmfd   r13!, {r2}
+
+        add     r1,r1,r2
+        mov     r3,#0
+        strb    r3,[r1]
+        sub             r1,r1,#1
+                
+        @ copie à l'envers de source dans longueur
+boucle:
+        cmp             r2,#0
+        beq             fin
+        ldrb    r3,[r0],#1
+        strb    r3,[r1],#-1
+        sub             r2,r2,#1
+        b               boucle
+fin:
+        @ restauration des registres utilises et fin du sous-programme
+        ldmfd   r13!, {r0, r1,r2,r3, r15}
+
+chaine: .asciz  "salut"
+dest:   .asciz  "qqqqqsxede"
+
+

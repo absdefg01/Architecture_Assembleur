@@ -1,0 +1,100 @@
+﻿@ ci 2015 exo3 
+
+.global _start
+_start:
+
+        orr r9,r9,r8
+        add r1,r2,r3, lsl r4
+        mov     r0,#2 
+        mov     r1,#9 
+        @ mise en pile des parametres d'entrée de puissance r0^r1
+        @ reservation de la place pour la valeur de retour 
+        sub   r13,r13,#4
+        stmfd   r13!, {r0,r1}
+        
+        @ appel de puiss_ind
+        bl      puiss_ind
+
+        @ récupération du parametre de retour dans r2
+        add     r13,r13,#8
+        ldmfd   r13!, {r2}
+
+exit:   b       exit
+
+
+@ sous-programme puiss_ind
+@
+@ en entree (dans la pile) :
+@       - x 
+@       - n
+@ en sortie (dans la pile):x^n
+
+
+puiss_ind:
+        @ sauvegarde des registres utilises
+        stmfd   r13!, {r0, r1,r2,r3, r14}
+
+        @ recuperation de x (r0) et n (r1)
+        ldr     r0, [r13,#20]
+        ldr     r1, [r13,#24]
+        
+        @ r2 contient la valeur de retour
+        mov     r2,#1
+                
+        @ cas de base r1=0
+        cmp     r1,#0
+        beq     fin
+                
+        @ test de parité de n (r1)
+        tst     r1,#1
+        beq     pair
+impair: @ on calcule x^(n-1)
+        sub     r1,r1,#1
+
+
+        @ reservation de la place pour la valeur de retour 
+        sub   r13,r13,#4
+        @ mise en pile des parametres d'entrée de puissance r0^r1
+        stmfd   r13!, {r0,r1}
+        
+        @ appel de puiss_ind
+        bl      puiss_ind
+
+        @ récupération du parametre de retour dans r2
+        add     r13,r13,#8
+        ldmfd   r13!, {r2}
+
+        @ calcul de x * a (r2*r0)
+        mul     r2,r0,r2
+        b       fin
+
+pair:
+        @ on calcule x^(n/2)
+        mov     r1,r1, lsr #1
+
+        @ reservation de la place pour la valeur de retour 
+        sub   r13,r13,#4
+        @ mise en pile des parametres d'entrée de puissance r0^r1
+        stmfd   r13!, {r0,r1}
+        
+        @ appel de puiss_ind
+        bl      puiss_ind
+
+        @ récupération du parametre de retour dans r2
+        add     r13,r13,#8
+        ldmfd   r13!, {r2}
+
+        @ calcul de x * x (r2*r2)
+        mul     r3,r2,r2
+        mov     r2,r3
+        
+
+fin:
+        @ on renvoie le parametre de retour
+        str   r2, [r13,#28]
+                
+        @ restauration des registres utilises et fin du sous-programme
+        ldmfd   r13!, {r0, r1,r2,r3, r15}
+
+
+
