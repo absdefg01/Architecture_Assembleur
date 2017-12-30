@@ -1,0 +1,14 @@
+.global _start	@ apres global on peut mettre ce qu'on veut
+@ initialisation du pointeur de pile
+_start: mov	r0,#3	@ r0 = 3 
+	mov	r1,#1	@ r1 = 1
+	add	r0,r0,#3	@ 0 <- r0 + 3
+	sub	r2,r1,r0	@ r2 <- r1 - r0
+	adr 	r2,tab1	@r3 <- tab3
+exit :  b	exit	@ boucle infinie
+
+tab1:	.int	2,3,-1
+tab2:	.fill	4,2,12
+chaine:	.asciz	"bonjour"
+tab3:	.byte	13,-3,'A'
+

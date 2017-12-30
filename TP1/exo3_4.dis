@@ -1,0 +1,17 @@
+
+exo3_4.elf:     file format elf32-littlearm
+
+Disassembly of section .text:
+00002000 <_start> e28f0020 	add	r0, pc, #32	; 0x20
+00002004 <debut> e4d01001 	ldrb	r1, [r0], #1
+00002008 <debut+0x4> e3510000 	cmp	r1, #0	; 0x0
+0000200c <debut+0x8> 0a000004 	beq	00002024 <exit>
+00002010 <debut+0xc> e3510061 	cmp	r1, #97	; 0x61
+00002014 <debut+0x10> 2afffffa 	bcs	00002004 <debut>
+00002018 <mini> e2811020 	add	r1, r1, #32	; 0x20
+0000201c <mini+0x4> e5401001 	strb	r1, [r0, -#1]
+00002020 <mini+0x8> eafffff7 	b	00002004 <debut>
+00002024 <exit> eafffffe 	b	00002024 <exit>
+00002028 <chaine> 42414141 	submi	r4, r1, #1073741840	; 0x40000010
+0000202c <chaine+0x4> 00000000 	andeq	r0, r0, r0
+Disassembly of section .data:

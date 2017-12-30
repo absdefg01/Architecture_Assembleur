@@ -1,0 +1,13 @@
+
+exo3_1.elf:     file format elf32-littlearm
+
+Disassembly of section .text:
+00002000 <_start> e59f100c 	ldr	r1, [pc, #12]	; 00002014 <var>
+00002004 <_start+0x4> e59f200c 	ldr	r2, [pc, #12]	; 00002018 <var2>
+00002008 <_start+0x8> e0813002 	add	r3, r1, r2
+0000200c <_start+0xc> e58f3008 	str	r3, [pc, #8]	; 0000201c <res>
+00002010 <exit> eafffffe 	b	00002010 <exit>
+00002014 <var> 00000002 	andeq	r0, r0, r2
+00002018 <var2> 00000005 	andeq	r0, r0, r5
+0000201c <res> 00000000 	andeq	r0, r0, r0
+Disassembly of section .data:
