@@ -1,0 +1,38 @@
+
+exo4.elf:     file format elf32-littlearm
+
+Disassembly of section .text:
+00002000 <_start> e3a0102e 	mov	r1, #46	; 0x2e
+00002004 <_start+0x4> e3a0200c 	mov	r2, #12	; 0xc
+00002008 <_start+0x8> e24dd004 	sub	sp, sp, #4	; 0x4
+0000200c <_start+0xc> e92d0006 	stmdb	sp!, {r1, r2}
+00002010 <_start+0x10> eb000002 	bl	00002020 <pgcd>
+00002014 <_start+0x14> e28dd008 	add	sp, sp, #8	; 0x8
+00002018 <_start+0x18> e8bd0002 	ldmia	sp!, {r1}
+0000201c <exit> eafffffe 	b	0000201c <exit>
+00002020 <pgcd> e92d4006 	stmdb	sp!, {r1, r2, lr}
+00002024 <pgcd+0x4> e59d100c 	ldr	r1, [sp, #12]
+00002028 <pgcd+0x8> e59d2010 	ldr	r2, [sp, #16]
+0000202c <tq> e3520000 	cmp	r2, #0	; 0x0
+00002030 <tq+0x4> 0a000006 	beq	00002050 <fin_pgcd>
+00002034 <tq+0x8> e24dd008 	sub	sp, sp, #8	; 0x8
+00002038 <tq+0xc> e92d0006 	stmdb	sp!, {r1, r2}
+0000203c <tq+0x10> eb000005 	bl	00002058 <debut>
+00002040 <tq+0x14> e1a01002 	mov	r1, r2
+00002044 <tq+0x18> e28dd008 	add	sp, sp, #8	; 0x8
+00002048 <tq+0x1c> e8bd0004 	ldmia	sp!, {r2}
+0000204c <tq+0x20> eafffff6 	b	0000202c <tq>
+00002050 <fin_pgcd> e58d1014 	str	r1, [sp, #20]
+00002054 <fin_pgcd+0x4> e8bd8006 	ldmia	sp!, {r1, r2, pc}
+00002058 <debut> e92d400e 	stmdb	sp!, {r1, r2, r3, lr}
+0000205c <debut+0x4> e59d1010 	ldr	r1, [sp, #16]
+00002060 <debut+0x8> e59d2014 	ldr	r2, [sp, #20]
+00002064 <boucle> e1510002 	cmp	r1, r2
+00002068 <boucle+0x4> 3a000002 	bcc	00002078 <fin>
+0000206c <boucle+0x8> e0411002 	sub	r1, r1, r2
+00002070 <boucle+0xc> e2833001 	add	r3, r3, #1	; 0x1
+00002074 <boucle+0x10> eafffffa 	b	00002064 <boucle>
+00002078 <fin> e58d1018 	str	r1, [sp, #24]
+0000207c <fin+0x4> e58d301c 	str	r3, [sp, #28]
+00002080 <fin+0x8> e8bd800e 	ldmia	sp!, {r1, r2, r3, pc}
+Disassembly of section .data:

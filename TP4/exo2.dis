@@ -1,0 +1,24 @@
+
+exo2.elf:     file format elf32-littlearm
+
+Disassembly of section .text:
+00002000 <_start> e3a0100a 	mov	r1, #10	; 0xa
+00002004 <_start+0x4> e3a02003 	mov	r2, #3	; 0x3
+00002008 <_start+0x8> e24dd008 	sub	sp, sp, #8	; 0x8
+0000200c <_start+0xc> e92d0006 	stmdb	sp!, {r1, r2}
+00002010 <_start+0x10> eb000002 	bl	00002020 <debut>
+00002014 <_start+0x14> e28dd008 	add	sp, sp, #8	; 0x8
+00002018 <_start+0x18> e8bd0180 	ldmia	sp!, {r7, r8}
+0000201c <exit> eafffffe 	b	0000201c <exit>
+00002020 <debut> e92d400e 	stmdb	sp!, {r1, r2, r3, lr}
+00002024 <debut+0x4> e59d1010 	ldr	r1, [sp, #16]
+00002028 <debut+0x8> e59d2014 	ldr	r2, [sp, #20]
+0000202c <boucle> e1510002 	cmp	r1, r2
+00002030 <boucle+0x4> 3a000002 	bcc	00002040 <fin>
+00002034 <boucle+0x8> e0411002 	sub	r1, r1, r2
+00002038 <boucle+0xc> e2833001 	add	r3, r3, #1	; 0x1
+0000203c <boucle+0x10> eafffffa 	b	0000202c <boucle>
+00002040 <fin> e58d1018 	str	r1, [sp, #24]
+00002044 <fin+0x4> e58d301c 	str	r3, [sp, #28]
+00002048 <fin+0x8> e8bd800e 	ldmia	sp!, {r1, r2, r3, pc}
+Disassembly of section .data:
