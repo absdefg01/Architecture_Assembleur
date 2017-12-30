@@ -1,0 +1,138 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start:
+main:
+        @ initialisation du pointeur de pile
+        mov     r13, #0x20000
+
+        @ initialisation de l'USART
+        bl      init_usart
+
+        @ le programme affichera a l'ecran les caracteres tapes au clavier
+        @ jusqu'a ce qu'on tape un '$'
+        
+tq:
+        @ lecture d'un caractere au clavier
+                sub      r13,r13,#4
+        bl      getchar
+                ldmfd r13!,{r0}
+        
+                @ et affichage sur gtkterm
+                stmfd r13!,{r0}
+        bl      putchar
+                add             r13,r13,#4
+                
+        @ est-ce un '$' ?
+        cmp     r0, #'$'
+        @ si oui on sort
+        beq     exit
+        @ si non on  recommence
+        b       tq
+
+exit:   b exit
+
+@==================================================================@
+@ Sous-programme initialisation USART                              @
+@ -----------------------------------                              @
+@ Paramètres : néant                                               @
+@ Valeur de retour : néant                                         @
+@==================================================================@
+
+init_usart:
+    stmfd r13!,{r0,r1,r14}
+
+@ Au cas ou, on desactive les ports du PIO
+@ pour USART1
+@ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ldr   r0,=PIO_BASE
+    mov   r1,#0x700000
+    str   r1,[r0,#PIO_PDR]
+    str   r1,[r0,#PIO_IDR]
+
+@ On initialise l'USART pour recevoir et transmettre des caractères
+@ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ldr   r0,=USART1_BASE
+
+    @ On fait un reset de l'émetteur et du récepteur
+    @-----------------------------------------------
+    ldr   r1,=(US_RSTRX|US_RSTTX|US_RSTSTA)
+    str   r1,[r0,#US_CR]
+
+    @ On active l'émetteur et le récepteur
+    @-------------------------------------
+    ldr   r1,=(US_RXEN|US_TXEN)
+    str   r1,[r0,#US_CR]
+
+    @ Configuration des modes
+    @------------------------
+    @   - Clock Selection = MCK/8 (US_CLKS_MCK)
+    @   - Taille de caractère = 8 (US_CHRL_8)
+    @   - Mode Asynchrone (SYNC=0)
+    @   - Pas de parité (US_PAR_NO)
+    @   - 1 stop bit (US_NBSTOP_1)
+    @   - Normal Channel Mode (US_CHMODE_NORMAL)
+    ldr r1,=(US_CLKS_MCK8|US_CHRL_8|US_PAR_NO|US_NBSTOP_1|US_CHMODE_NORMAL)
+    str r1,[r0,#US_MR]
+
+    @Initialisation du baud rate generator register (CD)
+    @---------------------------------------------------
+    @ Cette valeur est calculée à partir de
+    @   - MCK = 66.6 MHz
+    @   - débit du terminal = 57600
+    @   - mode asynchrone (débit = MCK/(CD*16))
+    mov   r1,#9
+    str   r1,[r0,#US_BRGR]
+
+    @Initialisation du temps de garde
+    @--------------------------------
+    mov   r1,#0xa
+    str   r1,[r0,#US_TTGR]
+
+    @ Désactivation des interruptions de tout genre
+    @----------------------------------------------
+    mov   r1,#0x3F
+    str   r1,[r0,#US_IDR]
+    ldmfd r13!,{r0,r1,r15}
+
+@==================================================================@
+@ Sous-programme envoi d'un caractère sur gtkterm                  @
+@ -----------------------------------------------                  @
+@ Paramètres : code ASCII passé dans la pile                            @
+@ Valeur de retour : néant                                         @
+@==================================================================@
+putchar:
+    stmfd r13!,{r0,r1,r2,r14}
+        ldr       r0,[r13,#16]
+    ldr   r1,=USART1_BASE
+put_wait:
+    ldr   r2,[r1,#US_CSR]
+    ands  r2,r2,#US_TXRDY
+    beq   put_wait
+    @ On place le caractère dans le registre
+    @ Transmitter Holding Register ( US_THR)
+    strb   r0,[r1,#US_THR]
+    ldmfd  r13!,{r0,r1,r2,r15}
+
+@==================================================================@
+@ Sous-programme saisie d'un caractère au clavier                  @
+@ -----------------------------------------------                  @
+@ Paramètres : néant                                               @
+@ Valeur de retour : code ASCII passé dans la pile                     @
+@==================================================================@
+getchar:
+    stmfd r13!,{r1,r2,r14}
+    ldr   r1,=USART1_BASE
+    @ Attente active de l'arrivée d'un caractère
+    @ tapé au clavier
+get_wait:
+    ldr   r2,[r1,#US_CSR]
+    ands  r2,r2,#US_RXRDY
+    beq   get_wait
+
+    @ Une fois le caractère saisi, on le place dans r0
+    ldrb  r1,[r1,#US_RHR]
+        str r1,[r13,#12]
+    ldmfd r13!,{r1,r2,r15}
+

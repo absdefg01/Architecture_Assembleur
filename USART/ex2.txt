@@ -1,0 +1,173 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start:
+main:
+        @ initialisation du pointeur de pile
+        mov     r13, #0x20000
+
+        @ initialisation de l'USART
+        bl      init_usart
+
+        @ initialisation compteur ITs
+        mov     r11,#0
+tq:     cmp     r11,#9
+        beq     ftq
+        b       tq
+
+ftq:
+        @ désactivation de l'IT de l'USART1        
+        ldr   r0,=USART1_BASE
+        mov   r1,#0x3F
+        str   r1,[r0,#US_IDR]
+
+exit:   b exit
+
+
+@==================================================================@
+@ Sous-programme initialisation USART                              @
+@ -----------------------------------                              @
+@ Paramètres : néant                                               @
+@ Valeur de retour : néant                                         @
+@==================================================================@
+
+init_usart:
+    stmfd r13!,{r0,r1,r2,r14}
+
+@ Au cas ou, on desactive les ports du PIO
+@ pour USART1
+@ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ldr   r0,=PIO_BASE
+        mov   r1,#0x700000
+        str   r1,[r0,#PIO_PDR]
+        str   r1,[r0,#PIO_IDR]
+
+@ On initialise l'USART pour recevoir et transmettre des caractères
+@ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ldr   r0,=USART1_BASE
+
+        @ On fait un reset de l'émetteur et du récepteur
+        @-----------------------------------------------
+        ldr   r1,=(US_RSTRX|US_RSTTX|US_RSTSTA)
+        str   r1,[r0,#US_CR]
+
+        @ On active l'émetteur et le récepteur
+        @-------------------------------------
+        ldr   r1,=(US_RXEN|US_TXEN)
+        str   r1,[r0,#US_CR]
+
+        @ Configuration des modes
+        @------------------------
+        @   - Clock Selection = MCK (US_CLKS_MCK8)
+        @   - Taille de caractère = 8 (US_CHRL_8)
+        @   - Mode Asynchrone (SYNC=0)
+        @   - Pas de parité (US_PAR_NO)
+        @   - 1 stop bit (US_NBSTOP_1)
+        @   - Normal Channel Mode (US_CHMODE_NORMAL)
+        ldr r1,=(US_CLKS_MCK8|US_CHRL_8|US_PAR_NO|US_NBSTOP_1|US_CHMODE_NORMAL)
+        str r1,[r0,#US_MR]
+
+        @Initialisation du baud rate generator register (CD)
+        @---------------------------------------------------
+        @ Cette valeur est calculée à partir de
+        @   - MCK = 66.6 MHz
+        @   - débit du terminal = 57600
+        @   - mode asynchrone (débit = MCK/8/(CD*16))
+        mov   r1,#9
+        str   r1,[r0,#US_BRGR]
+
+        @Initialisation du temps de garde
+        @--------------------------------
+        mov   r1,#0xa
+        str   r1,[r0,#US_TTGR]
+
+        @ congiguration des IT sur l'USART
+        
+        @ desactivation de toutes les IT de l'USART (celles des boutons et des diodes)
+        mov   r1,#0x3F
+        str   r1,[r0,#US_IDR]
+
+        @ Activation d'interruption à réception d'un caractère
+        mov   r1,#US_RXRDY
+        str   r1,[r0,#US_IER]
+
+        
+        @ configuration de l'AIC
+        ldr     r2, =AIC_BASE
+        @ interdiction des IT de l'USART1 dans l'AIC (ligne 3)
+        mov     r0, #(1<<3)
+        str     r0, [r2, #AIC_IDCR]
+
+        @ on met l'adresse du sous-programme
+        @ traitant l'IT dans AIC_SVR3
+        adr     r0, GESTION_IT_USART1
+        str     r0, [r2, #AIC_SVR3]
+
+        @ definition de srctype et de la priorite de l'IT
+        @  - srctype : on met n'importe quoi (ici 00) ca change rien
+        @ car il y aura une IT au changement de niveau toujours
+        @  - prio : mettre n'importe quoi >0 (ici 3) 
+        @ car il n'y a qu'une source d'IT 
+        mov     r0, #0b0000011 
+        str     r0, [r2, #AIC_SMR3]
+
+        @ RAZ d'eventuelles IT de l'USART
+        mov     r0, #(1<<3)
+        str     r0, [r2, #AIC_ICCR]
+
+        @ config teminee, on autorise les IT de l'USART1
+        str     r0, [r2, #AIC_IECR]
+       
+        ldmfd r13!,{r0,r1,r2,r15}
+
+@==================================================================@
+@ Sous-programme envoi d'un caractère sur gtkterm                  @
+@ -----------------------------------------------                  @
+@ Paramètres : code ASCII passé dans la pile                            @
+@ Valeur de retour : néant                                         @
+@==================================================================@
+putchar:
+    stmfd r13!,{r0,r1,r2,r14}
+        ldr       r0,[r13,#16]
+    ldr   r1,=USART1_BASE
+put_wait:
+    ldr   r2,[r1,#US_CSR]
+    ands  r2,r2,#US_TXRDY
+    beq   put_wait
+    @ On place le caractère dans le registre
+    @ Transmitter Holding Register ( US_THR)
+    strb   r0,[r1,#US_THR]
+    ldmfd  r13!,{r0,r1,r2,r15}
+
+@==================================================================@
+@ Gestionnaire d'IT de saisie d'un caractère au clavier            @
+@ -----------------------------------------------                  @
+@==================================================================@
+GESTION_IT_USART1:
+@ Ajuster et sauvegarder le registre de retour du mode IRQ dans la pile IRQ
+        sub     r14, r14, #4
+        stmfd   r13!, {r0, r1, r14}
+
+        @ RAZ de l'IT usart
+        ldr     r0, =USART1_BASE
+        ldrb    r1,[r0,#US_RHR]
+        
+        @ Indiquer la prise en compte de l'interruption à l'AIC
+    @ ecriture de n'importe quoi dans AIC_EOICR
+    ldr     r0, =AIC_BASE
+    str     r0, [r0, #AIC_EOICR] 
+        
+        @ incrémentation compteur
+        add     r11,r11,#1
+        add     r0,r11,#'0'
+        stmfd r13!,{r0}
+        bl      putchar
+        add r13,r13,#4
+ 
+    @ Restaurer  r14_irq depuis la pile IRQ et le mettre
+    @ directement dans le PC en restaurant aussi CPSR
+    ldmfd       r13!, {r0, r1, pc}^
+
+
+

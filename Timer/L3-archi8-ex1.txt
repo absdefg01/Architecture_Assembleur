@@ -1,0 +1,123 @@
+﻿.include        "carte.inc"
+
+.global _start
+
+_start:
+main:   @ initialisation du pointeur de pile
+        mov     r13, #0x20000
+
+        @@ configuration des diodes
+
+        @ on charge l'adresse de base des registres du PIO
+        ldr     r0, =PIO_BASE
+        
+        @ on charge les numeros de port des diodes
+        ldr     r1, =(LED1 | LED2 | LED3 | LED4 | LED5 | LED6 | LED7 | LED8)
+        @ on valide les ports correspondant aux diodes sur le PIO
+        str     r1, [r0, #PIO_PER]
+        @ et on les configure en sortie
+        str     r1, [r0, #PIO_OER]
+        @ on eteint les diodes
+        str     r1, [r0, #PIO_SODR]
+
+
+        @@ configuration du timer
+
+        @ on "l'eteint" avant de le configurer
+        ldr     r1, =TC1_BASE
+        mov     r0, #0b10
+        str     r0, [r1, #TC_CCR]
+        @ interdiction de toutes les IT du timer
+        mvn     r0, #0x0
+        str     r0, [r1, #TC_IDR]
+        @ RAZ dune eventuelle IT au niveau du timer
+        ldr     r0, [r1, #TC_SR]
+        @ paramètres de timing du timer 1   
+        @ utilisation de MCK/1024 et redemarrage auto
+        ldr     r0, =0x4004
+        str     r0, [r1, #TC_CMR]
+        @ MCK (horloge du proc) est a 66Mhz donc
+        @ MCK/1024 * 64453 = delai d'une seconde
+        ldr     r0, =64453
+        str     r0, [r1, #TC_RC]                
+        
+        @ autorisation du comptage
+        mov     r0, #1
+        str     r0, [r1, #TC_CCR]
+
+        @ autorisation de l'IT generee quand le compteur atteint TC_RC
+        mov     r0, #0x10
+        str     r0, [r1, #TC_IER]
+
+        
+        @ configuration de l'AIC
+        ldr     r2, =AIC_BASE
+        @ interdiction des IT du Timer dans l'AIC (ligne 5)
+        mov     r0, #(1<<5)
+        str     r0, [r2, #AIC_IDCR]
+
+        @ on met l'adresse du sous-programme
+        @ traitant l'IT dans AIC_SVR5
+        adr     r0, GESTION_IT_TIMER
+        str     r0, [r2, #AIC_SVR5]
+        @ front montant et priorité 4 
+        mov     r0, #0b1100100
+        str     r0, [r2, #AIC_SMR5]     
+
+        @ RAZ d'eventuelles IT du timer au niveau de l'AIC
+        mov     r0, #(1<<5)
+        str     r0, [r2, #AIC_ICCR]
+        @ config teminee, on autorise les IT du timer
+        str     r0, [r2, #AIC_IECR]
+        
+        
+        @ Mise à 1 bu bit 2 de CCR => RAZ compteur et démarrage
+        mov     r0, #0b100
+        str     r0, [r1, #TC_CCR]
+        
+        @ initialisation de r11 (qui sert de temoin d'allumage de LED1)
+        mov     r11,#0
+        
+        ldr     r4, =LED1
+        ldr     r1, =PIO_BASE
+        
+        @ le programme boucle indefiniment, pour l'arreter
+        @ il faut utiliser le debugger
+boucle_sans_fin:
+        
+        @ si r11=0 on allume LED1 sinon on l'etteint
+        cmp     r11,#0
+        beq     allume
+eteint: str     r4, [r1, #PIO_SODR]
+        b       suite
+allume: str     r4, [r1, #PIO_CODR]
+suite:        
+        b       boucle_sans_fin
+
+        @ on arrive jamais ici
+exit:
+        b exit
+
+@ sous-programme GESTION_IT_TIMER, traitement de l'IT generee par le timer 1
+
+GESTION_IT_TIMER:       
+        @ Ajuster et sauvegarder le registre de retour du mode IRQ dans la pile IRQ
+        sub     r14, r14, #4
+        stmfd   r13!, {r0, r1, r14}
+
+        @ inversion r11
+        mvn     r11,r11
+
+        @ RAZ de l'IT au niveau du timer        
+        ldr     r1,=TC1_BASE
+        ldr     r0,[r1, #TC_SR]         
+
+        @ Indiquer la prise en compte de l'interruption à l'AIC
+        @ ecriture de n'importe quoi dans AIC_EOICR
+        ldr     r0, =AIC_BASE
+        str     r0, [r0, #AIC_EOICR]
+
+        @ Restaurer  r14_irq depuis la pile IRQ et le mettre
+        @ directement dans le PC en changeant de mode
+        ldmfd   r13!, {r0, r1, pc}^
+
